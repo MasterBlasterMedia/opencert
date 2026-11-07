@@ -11,7 +11,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@hookform/resolvers": "6.0.2",
+    "@hookform/resolvers": "7.0.2",
     "@tanstack/react-query": "5.105.0",
     "lucide-react": "1.64.0",
     "qrcode": "1.5.4",
