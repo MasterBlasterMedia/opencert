@@ -1,0 +1,43 @@
+# Local development only. Production requires HTTPS, verified email delivery and encrypted Data Protection keys.
+services:
+  database:
+    image: postgres:18.6-bookworm
+    environment:
+      POSTGRES_USER: opencert
+      POSTGRES_DB: opencert
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a random local password in .env}
+    volumes:
+      - database:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opencert -d opencert"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build: {context: ., target: api}
+    command: ["--migrate"]
+    environment: &environment
+      DOTNET_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Database: Host=database;Database=opencert;Username=opencert;Password=${POSTGRES_PASSWORD}
+      Web__Origin: http://localhost:8080
+      Email__DevelopmentDirectory: /mail
+    depends_on:
+      database: {condition: service_healthy}
+  api:
+    build: {context: ., target: api}
+    user: ${LOCAL_UID:-1000}:${LOCAL_GID:-1000}
+    environment: *environment
+    ports: ["127.0.0.1:8080:8080"]
+    volumes: ["./.local/mail:/mail"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  worker:
+    build: {context: ., target: worker}
+    user: ${LOCAL_UID:-1000}:${LOCAL_GID:-1000}
+    environment: *environment
+    volumes: ["./.local/mail:/mail"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+volumes:
+  database:

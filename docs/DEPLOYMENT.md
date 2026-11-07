@@ -1,0 +1,62 @@
+# Deployment and operations
+
+This is a deployment proposal for a development release, not a statement that the release gates have passed. Read ../VERIFICATION.md first.
+
+## Topology
+
+Serve the built React client and ASP.NET API from one HTTPS Render web service. Deploy a separate worker from the same source revision. Use Neon PostgreSQL for persistent state and the encrypted shared Data Protection key ring. Customer certificate keys stay on customer machines. No persistent Render disk is needed for application state.
+
+`render.yaml` uses a free web instance and a paid `0.5c-512mb` worker plan. **Applying it incurs worker costs. Obtain operator approval and check the current Render price first.** A free web service can sleep and is not an uptime guarantee. This proposal has automatic deployment disabled. No paid resources have been provisioned by the development process.
+
+## Required configuration
+
+| Variable | Purpose |
+| --- | --- |
+| `Web__Origin` | Exact browser origin, e.g. `https://YOUR-SERVICE.onrender.com` |
+| `ConnectionStrings__Database` | Npgsql connection string; production requires `SSL Mode=VerifyFull` |
+| `Security__KeyEncryptionCertificateBase64` | Base64 PKCS#12 wrapping certificate with its private key, held in Render secrets |
+| `Security__KeyEncryptionPassword` | Password protecting that PKCS#12 file |
+| `Email__ResendApiKey` / `Email__From` | Resend key and verified sender |
+| `Acme__Directory` | Staging directory initially; never silently change to production |
+| `Acme__ContactEmail` | Operator-controlled CA contact address |
+
+Instead of the base64 setting, an external secret file can be referenced by `Security__KeyEncryptionCertificate`. Use the same wrapping key and password for API, worker and migration processes. Back up it separately from PostgreSQL; losing it can make authenticator/ACME secrets unreadable. Restrict secret-management access. Do not store the wrapping key in the database it protects.
+
+Do not reuse a customer certificate key as the wrapping key. Rotation must retain old wrapping certificates while old key-ring entries remain in use; the current single-certificate configuration requires a planned maintenance/reencryption procedure before rotation and a tested backup. Do not claim rotation is automated.
+
+## Database and migrations
+
+Create a separate Neon staging branch. Apply all migrations there with a **direct** connection, then run the integration checks against disposable data. `--migrate` is explicit: application startup never silently changes schema. Use a direct production connection for the migration step after reviewing the generated migration and backup/restore plan. Runtime pooling must be tested separately; no pooler compatibility claim is made yet.
+
+```sh
+# Supply secrets in the process environment through your host/secret manager.
+dotnet OpenCert.Api.dll --migrate
+```
+
+Migrations on free Render web services must run separately because Render pre-deploy commands require a paid service. Avoid concurrent migration runs; EF's provider migration lock and a single release operator are required. Do not put database credentials in the build context or Docker build arguments. Production connection strings are parsed and checked for `VerifyFull`, not accepted by substring matching.
+
+## Reverse proxy and public HTTPS
+
+Render terminates public TLS. Configure forwarded headers only for the documented trusted ingress addresses/networks and verify the resulting public scheme/host. Do not trust arbitrary `X-Forwarded-*` headers. Callback URI, rate-limiter client IP, HTTPS redirects and host filtering require a deployment-specific check before enabling provider login. This proxy-hardening gate is outstanding.
+
+Use the same origin for browser and API. A separate static site on an unrelated `onrender.com` site is not an equivalent authentication topology. Separate custom subdomains require explicit CORS/cookie configuration and browser verification.
+
+## Deploy and verify
+
+1. Complete the release gates, review costs, configure verified email and publish operator privacy/terms/security contacts.
+2. Build the API and worker images from one reviewed revision and run CI. `deploy/api.Dockerfile` packages the client; `deploy/worker.Dockerfile` packages the worker.
+3. Validate `render.yaml` against Render's current schema using `node scripts/validate-blueprint.mjs` from `apps/web`, and validate it in Render before applying.
+4. Apply migrations to a staging branch, test, then migrate the intended deployment database with a direct connection.
+5. Create the approved services. Set secret values through Render; the worker references the web service's shared secret variables.
+6. Wait for the exact deploy to become live. Check `/health/ready`, actual email sign-in, passkey RP/origin behavior, TOTP, the `/api/v1/status` worker heartbeat and a persisted website check.
+7. Complete a Let's Encrypt staging issuance and installation on a domain/server you control. An issued certificate alone does not verify public HTTPS or renewal.
+
+`/health/live` checks process availability; `/health/ready` checks database reachability. Public `/api/v1/status` distinguishes API, database and worker. Structured logs omit secret values; avoid increasing framework request/token logging in production. Add monitoring and alerts before real customer use.
+
+## Rollback, backup and recovery
+
+Keep the preceding compatible image and source revision. A Render rollback does not reverse database migrations or external DNS/CA operations. Prefer backward-compatible schema changes; restore into a separate Neon branch and validate before replacing a live database. Do not drop schema to force an older application to start.
+
+Test restoration of PostgreSQL **and** the wrapping key together. Verify that existing sessions, authenticator secrets and ACME accounts can be read after a restart. Revoking an application session does not revoke a provider grant, and deleting a workspace does not remove external DNS records or installed certificates.
+
+Primary references checked 2026-11-07: [Blueprint fields](https://render.com/docs/blueprint-spec), [service types](https://render.com/docs/service-types), [deploy lifecycle](https://render.com/docs/deploys), [health checks](https://render.com/docs/health-checks), [background workers](https://render.com/docs/background-workers).

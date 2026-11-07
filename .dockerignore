@@ -1,0 +1,15 @@
+.git
+**/node_modules
+**/bin
+**/obj
+**/dist
+**/test-results
+**/playwright-report
+**/__pycache__
+.local
+.env
+.env.*
+*.pfx
+*.pem
+*.key
+docs/SPECIFICATION.md

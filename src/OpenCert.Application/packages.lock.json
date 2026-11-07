@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "opencert.contracts": {
+        "type": "Project"
+      },
+      "opencert.domain": {
+        "type": "Project"
+      }
+    }
+  }
+}

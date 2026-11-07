@@ -1,0 +1,80 @@
+name: Verify OpenCert
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: opencert_ci
+          POSTGRES_PASSWORD: disposable-ci-only
+          POSTGRES_DB: opencert_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U opencert_ci -d opencert_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      ASPNETCORE_ENVIRONMENT: Development
+      DOTNET_ENVIRONMENT: Development
+      ConnectionStrings__Database: Host=localhost;Port=5432;Database=opencert_ci;Username=opencert_ci;Password=disposable-ci-only
+      Web__Origin: http://localhost:5173
+      Logging__LogLevel__Default: Warning
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.1'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: dotnet restore OpenCert.sln --locked-mode
+      - run: dotnet build OpenCert.sln --no-restore
+      - run: dotnet test tests/OpenCert.UnitTests/OpenCert.UnitTests.csproj --no-build --no-restore
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm audit --audit-level=moderate
+        working-directory: apps/web
+      - run: npm run lint && npm test && npm run build
+        working-directory: apps/web
+      - run: node scripts/validate-blueprint.mjs
+        working-directory: apps/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Apply disposable database migrations
+        run: dotnet apps/api/bin/Debug/net10.0/OpenCert.Api.dll --migrate
+      - name: Start local services
+        run: |
+          mkdir -p .local/mail
+          chmod 700 .local/mail
+          ASPNETCORE_URLS=http://localhost:5080 dotnet apps/api/bin/Debug/net10.0/OpenCert.Api.dll > /tmp/opencert-api.log 2>&1 &
+          dotnet apps/worker/bin/Debug/net10.0/OpenCert.Worker.dll > /tmp/opencert-worker.log 2>&1 &
+          npm run dev --prefix apps/web -- --port 5173 > /tmp/opencert-web.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:5080/health/ready && curl --fail --silent --output /dev/null http://localhost:5173; then exit 0; fi
+            sleep 1
+          done
+          exit 1
+      - run: python3 tests/OpenCert.IntegrationTests/test_api.py
+      - run: npm run e2e
+        working-directory: apps/web
+      # Do not upload private mail, authenticated browser traces, or unredacted logs.
+  containers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - run: docker build -f deploy/api.Dockerfile -t opencert-api:ci .
+      - run: docker build -f deploy/worker.Dockerfile -t opencert-worker:ci .

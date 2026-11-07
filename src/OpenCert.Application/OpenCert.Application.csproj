@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><ProjectReference Include="../OpenCert.Domain/OpenCert.Domain.csproj"/><ProjectReference Include="../OpenCert.Contracts/OpenCert.Contracts.csproj"/></ItemGroup></Project>

@@ -1,0 +1,18 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/TestResults/
+**/playwright-report/
+**/test-results/
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+*.pem
+.local/
+
+**/__pycache__/
+# Original pasted instructions remain local; public requirements are documented in VERIFICATION.md.
+docs/SPECIFICATION.md
