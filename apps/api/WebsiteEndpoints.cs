@@ -7,7 +7,7 @@ namespace OpenCert.Api;
 
 public static class WebsiteEndpoints
 {
-    static object View(Website w) => new { w.Id, w.Hostname, w.SetupMethod, w.HttpsTrusted, w.ExpiresAt, w.CheckedAt, w.Issuer, w.Fingerprint, w.HostingProvider, w.DnsProvider, w.Diagnostic, status = WebsiteStatus.Describe(w.HttpsTrusted, w.ExpiresAt, w.CheckedAt, DateTimeOffset.UtcNow), renewal = "Not confirmed", discovery = JsonSerializer.Deserialize<JsonElement>(w.DiscoveryJson) };
+    static object View(Website w) => new { w.Id, w.Hostname, w.SetupMethod, w.HttpsTrusted, w.ExpiresAt, w.CheckedAt, w.CertificateObservedAt, w.NextCheckAt, w.Issuer, w.Fingerprint, w.HostingProvider, w.DnsProvider, w.Diagnostic, status = WebsiteStatus.Describe(w.HttpsTrusted, w.ExpiresAt, w.CheckedAt, DateTimeOffset.UtcNow), renewal = "Not confirmed", discovery = JsonSerializer.Deserialize<JsonElement>(w.DiscoveryJson) };
     public static void MapWebsites(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/organizations/{organization:guid}").RequireAuthorization();

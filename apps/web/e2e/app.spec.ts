@@ -126,6 +126,18 @@ test("email account, onboarding and persistent website details", async ({
   ).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Display name")).toHaveValue("Browser tester");
+  const alerts = page.getByRole("checkbox", {
+    name: "Email me about certificate expiration, renewal reminders and failed requests",
+  });
+  await expect(alerts).toBeChecked();
+  await alerts.uncheck();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Notification preference saved." }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(alerts).not.toBeChecked();
 });
 test("passkey registration, verified sign-in, replay rejection and removal", async ({
   page,

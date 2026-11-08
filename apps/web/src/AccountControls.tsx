@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, post, type Me } from "./api";
 import { CopyValue, ErrorBox } from "./components";
 import s from "./App.module.scss";
+import { NotificationPreferences } from "./NotificationPreferences";
 export function AccountControls({ me }: { me: Me }) {
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -66,6 +67,7 @@ export function AccountControls({ me }: { me: Me }) {
   });
   return (
     <>
+      <NotificationPreferences />
       <section className={s.panel}>
         <h2>Your profile</h2>
         <p>{me.email} · verified</p>

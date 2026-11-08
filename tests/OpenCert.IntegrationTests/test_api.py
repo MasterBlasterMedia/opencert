@@ -52,6 +52,14 @@ def enroll(client):
     status,result=client.request('/auth/totp/enable','POST',{'code':totp(setup['secret'])}); assert status==200,(status,result)
     return setup['secret'],result['recoveryCodes']
 class ApiSecurityTests(unittest.TestCase):
+    def test_notification_preferences_are_private_and_persisted(self):
+        a=Client();a.login();b=Client();b.login()
+        self.assertTrue(a.request('/account/notifications')[1]['certificateEmails'])
+        self.assertEqual(a.request('/account/notifications','PUT',{'certificateEmails':False},csrf=False)[0],400)
+        self.assertEqual(a.request('/account/notifications','PUT',{'certificateEmails':False})[0],200)
+        self.assertFalse(a.request('/account/notifications')[1]['certificateEmails'])
+        self.assertTrue(b.request('/account/notifications')[1]['certificateEmails'])
+        self.assertEqual(Client().request('/account/notifications')[0],401)
     def test_complete_security_journey(self):
         a=Client(); email,me,flow,code=a.login(); org=me['organizations'][0]['id']; path='/organizations/'+org
         self.assertEqual(a.request('/auth/email/finish','POST',{'flowId':flow,'code':code})[0],400,'single-use email code')

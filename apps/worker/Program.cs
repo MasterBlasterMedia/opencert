@@ -9,6 +9,7 @@ using OpenCert.Infrastructure;
 var builder = Host.CreateApplicationBuilder(args);
 builder.Logging.ClearProviders(); builder.Logging.AddJsonConsole();
 builder.Services.AddOpenCert(builder.Configuration, builder.Environment); builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<MaintenanceWorker>();
 await builder.Build().RunAsync();
 
 public sealed class Worker(IServiceScopeFactory scopes, ILogger<Worker> logger) : BackgroundService
@@ -51,7 +52,9 @@ public sealed class Worker(IServiceScopeFactory scopes, ILogger<Worker> logger) 
                             var discovery = await scope.ServiceProvider.GetRequiredService<IHostingDiscovery>().Discover(website.Hostname, stoppingToken);
                             var https = await scope.ServiceProvider.GetRequiredService<IHttpsInspector>().Inspect(website.Hostname, stoppingToken);
                             website.HostingProvider = discovery.HostingProvider; website.DnsProvider = discovery.DnsProvider; website.DiscoveryJson = JsonSerializer.Serialize(discovery);
-                            website.HttpsTrusted = https.Trusted; website.ExpiresAt = https.ExpiresAt; website.Issuer = https.Issuer; website.Fingerprint = https.Fingerprint; website.Diagnostic = https.Message; website.CheckedAt = DateTimeOffset.UtcNow;
+                            website.HttpsTrusted = https.Trusted;
+                            if (https.ExpiresAt is not null) { website.ExpiresAt = https.ExpiresAt; website.Issuer = https.Issuer; website.Fingerprint = https.Fingerprint; website.CertificateObservedAt = DateTimeOffset.UtcNow; }
+                            website.Diagnostic = https.Message; website.CheckedAt = DateTimeOffset.UtcNow;
                             await db.SaveChangesAsync(stoppingToken); break;
                         case "EmailSend": await scope.ServiceProvider.GetRequiredService<EmailOutbox>().Deliver(job.ResourceId, stoppingToken); break;
                         case "AcmeCreate": await scope.ServiceProvider.GetRequiredService<AcmeOrders>().Create(job.ResourceId); break;

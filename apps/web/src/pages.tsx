@@ -370,7 +370,7 @@ export function WebsiteDetail() {
             </strong>
           </div>
           <div className={s.statusRow}>
-            <span>Certificate expiration</span>
+            <span>Last observed certificate expires</span>
             <strong>
               {w.expiresAt
                 ? new Date(w.expiresAt).toLocaleDateString()
@@ -389,6 +389,17 @@ export function WebsiteDetail() {
                 : "Check queued"}
             </strong>
           </div>
+          <div className={s.statusRow}>
+            <span>Next scheduled check</span>
+            <strong>{new Date(w.nextCheckAt).toLocaleString()}</strong>
+          </div>
+          {w.expiresAt && w.httpsTrusted !== true && (
+            <p>
+              The expiration shown is from an earlier successful check. Verify
+              the current certificate after fixing HTTPS or installing a
+              replacement.
+            </p>
+          )}
           <button
             className={s.secondary}
             onClick={() => check.mutate()}

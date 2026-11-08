@@ -318,6 +318,9 @@ namespace OpenCert.Infrastructure.Migrations
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("RenewalDueAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("Staging")
                         .HasColumnType("boolean");
 
@@ -329,6 +332,8 @@ namespace OpenCert.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("RenewalDueAt");
 
                     b.HasIndex("WebsiteId", "OrganizationId");
 
@@ -538,6 +543,9 @@ namespace OpenCert.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("DeduplicationKey")
+                        .HasColumnType("text");
+
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasColumnType("text");
@@ -549,6 +557,9 @@ namespace OpenCert.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DeduplicationKey")
+                        .IsUnique();
 
                     b.HasIndex("OrganizationId");
 
@@ -589,8 +600,14 @@ namespace OpenCert.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("PayloadProtected")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RecipientUserId")
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("SentAt")
@@ -600,6 +617,8 @@ namespace OpenCert.Infrastructure.Migrations
 
                     b.HasIndex("DeduplicationKey")
                         .IsUnique();
+
+                    b.HasIndex("RecipientUserId", "CreatedAt");
 
                     b.ToTable("OutgoingEmails");
                 });
@@ -633,6 +652,11 @@ namespace OpenCert.Infrastructure.Migrations
 
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("CertificateEmails")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -730,6 +754,9 @@ namespace OpenCert.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("CertificateObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("CheckedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -766,6 +793,9 @@ namespace OpenCert.Infrastructure.Migrations
                     b.Property<string>("Issuer")
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset>("NextCheckAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -774,6 +804,8 @@ namespace OpenCert.Infrastructure.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("NextCheckAt");
 
                     b.HasIndex("OrganizationId", "Hostname")
                         .IsUnique();

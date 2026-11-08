@@ -3,8 +3,15 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OpenCert.Infrastructure;
+using OpenCert.Application;
 using Xunit;
+[assembly: CollectionBehavior(DisableTestParallelization = true)]
 namespace OpenCert.PersistenceTests;
+public sealed class NoExternalEmail : IEmailDelivery
+{
+    public int Sent { get; private set; }
+    public Task Send(string to, string subject, string text, string idempotencyKey, CancellationToken ct) { Sent++; return Task.CompletedTask; }
+}
 public sealed class TestDatabase : IAsyncLifetime
 {
     public ServiceProvider Services { get; private set; } = null!;
@@ -17,7 +24,8 @@ public sealed class TestDatabase : IAsyncLifetime
         services.AddSingleton<IDataProtectionProvider>(new EphemeralDataProtectionProvider());
         services.AddDbContext<AppDb>(o => o.UseNpgsql(connection));
         services.AddIdentityCore<User>(o => o.Stores.SchemaVersion = IdentitySchemaVersions.Version3).AddEntityFrameworkStores<AppDb>();
-        services.AddScoped<JobQueue>(); Services = services.BuildServiceProvider();
+        services.AddScoped<JobQueue>(); services.AddScoped<OperationalMaintenance>(); services.AddScoped<EmailOutbox>();
+        services.AddSingleton<NoExternalEmail>(); services.AddSingleton<IEmailDelivery>(provider => provider.GetRequiredService<NoExternalEmail>()); Services = services.BuildServiceProvider();
         using var scope = Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<AppDb>(); await db.Database.MigrateAsync();
     }
     public async Task DisposeAsync() => await Services.DisposeAsync();

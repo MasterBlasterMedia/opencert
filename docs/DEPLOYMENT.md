@@ -57,7 +57,13 @@ Use the same origin for browser and API. A separate static site on an unrelated 
 6. Wait for the exact deploy to become live. Check `/health/ready`, actual email sign-in, passkey RP/origin behavior, TOTP, the `/api/v1/status` worker heartbeat and a persisted website check.
 7. Complete a Let's Encrypt staging issuance and installation on a domain/server you control. An issued certificate alone does not verify public HTTPS or renewal.
 
-`/health/live` checks process availability; `/health/ready` checks database reachability. Public `/api/v1/status` distinguishes API, database and worker. Structured logs omit secret values; avoid increasing framework request/token logging in production. Add monitoring and alerts before real customer use.
+`/health/live` checks process availability; `/health/ready` checks database reachability and requires all application migrations to be applied. Public `/api/v1/status` distinguishes API, database and worker. Structured logs omit secret values; avoid increasing framework request/token logging in production. Add monitoring and alerts before real customer use.
+
+## Scheduled checks and reminders
+
+The worker schedules public HTTPS checks every six hours and checks due schedules once a minute. Expiration notices use the last observed certificate and thresholds of 30, 14, 7 and 1 day, then expiration. A failed live check does not erase the last observed certificate; the UI labels that historical observation. Each certificate/threshold generates at most one workspace notice. Manual renewal reminders use two-thirds of the certificate’s actual validity period; ARI and unattended agent deployment remain separate release gates.
+
+Users can disable operational certificate email in account settings. Security messages remain mandatory. Operational email is capped at 20 per recipient per day; workspace notifications remain available when the cap suppresses email. Before delivery, the worker re-checks current workspace membership, the verified email and the email preference. Reminders and preference tests use the private local mail sink; no real-delivery claim is made.
 
 ## Rollback, backup and recovery
 

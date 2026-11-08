@@ -1,1 +1,0 @@
-{"root":["./src/AccountControls.tsx","./src/App.tsx","./src/ConnectedAccounts.tsx","./src/Team.tsx","./src/api.ts","./src/components.test.tsx","./src/components.tsx","./src/content.ts","./src/main.tsx","./src/pages.tsx","./src/passkeys.ts","./src/test-setup.ts","./vite.config.ts","./playwright.config.ts"],"version":"6.0.3"}

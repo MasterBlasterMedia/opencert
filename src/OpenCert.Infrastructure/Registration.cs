@@ -23,7 +23,7 @@ public static class Registration
         services.AddHttpClient<IEmailDelivery, EmailDelivery>(c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddHttpClient("Acme", client => client.Timeout = TimeSpan.FromSeconds(30))
             .ConfigurePrimaryHttpMessageHandler(() => AcmeTransport.Create(config, environment));
-        services.AddScoped<EmailOutbox>(); services.AddScoped<AcmeOrders>(); services.AddScoped<JobQueue>();
+        services.AddScoped<EmailOutbox>(); services.AddScoped<AcmeOrders>(); services.AddScoped<JobQueue>(); services.AddScoped<OperationalMaintenance>();
         return services;
     }
 }

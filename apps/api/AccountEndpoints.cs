@@ -17,6 +17,11 @@ public static class AccountEndpoints
     public static void MapAccount(this WebApplication app)
     {
         var group = app.MapGroup("/api/v1/account").RequireAuthorization().RequireRateLimiting("auth");
+        group.MapGet("/notifications", async (AppDb db, HttpContext ctx) => Results.Ok(new { certificateEmails = await db.Users.Where(u => u.Id == ctx.UserId()).Select(u => u.CertificateEmails).SingleAsync() }));
+        group.MapPut("/notifications", async (NotificationPreferencesInput input, AppDb db, HttpContext ctx) =>
+        {
+            var uid = ctx.UserId(); await db.Users.Where(u => u.Id == uid).ExecuteUpdateAsync(s => s.SetProperty(u => u.CertificateEmails, input.CertificateEmails)); return Results.Ok(new { input.CertificateEmails });
+        });
         group.MapPut("/profile", async (NameInput input, AppDb db, HttpContext ctx) =>
         {
             if (input.Name.Trim().Length is < 1 or > 80) throw new ApiFailure(400, "Use a display name between 1 and 80 characters.");
@@ -83,3 +88,4 @@ public static class AccountEndpoints
         });
     }
 }
+public record NotificationPreferencesInput(bool CertificateEmails);

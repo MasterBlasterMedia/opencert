@@ -2,6 +2,7 @@
 **/obj/
 **/node_modules/
 **/dist/
+**/*.tsbuildinfo
 **/TestResults/
 **/playwright-report/
 **/test-results/

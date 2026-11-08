@@ -37,6 +37,11 @@ public sealed class AppDb(DbContextOptions<AppDb> options, IDataProtectionProvid
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
+        b.Entity<User>().Property(x => x.CertificateEmails).HasDefaultValue(true);
+        b.Entity<Website>().HasIndex(x => x.NextCheckAt);
+        b.Entity<CertificateOrder>().HasIndex(x => x.RenewalDueAt);
+        b.Entity<Notification>().HasIndex(x => x.DeduplicationKey).IsUnique();
+        b.Entity<OutgoingEmail>().HasIndex(x => new { x.RecipientUserId, x.CreatedAt });
         b.Entity<Invitation>().HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
         b.Entity<Invitation>().HasIndex(x => new { x.OrganizationId, x.Email, x.CreatedAt });
         b.Entity<OutgoingEmail>().HasIndex(x => x.DeduplicationKey).IsUnique();

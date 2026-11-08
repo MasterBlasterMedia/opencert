@@ -85,6 +85,7 @@ public sealed class AcmeOrders(AppDb db, IDataProtectionProvider protection, ICo
         order.CertificatePem = pem;
         using var certificate = X509Certificate2.CreateFromPem(order.CertificatePem);
         order.ExpiresAt = new DateTimeOffset(certificate.NotAfter.ToUniversalTime()); order.State = "Issued";
+        order.RenewalDueAt = OpenCert.Domain.RenewalPolicy.Due(new DateTimeOffset(certificate.NotBefore.ToUniversalTime()), order.ExpiresAt.Value);
         order.Diagnostic = order.Staging ? "Test certificate issued. Browsers do not trust staging certificates. Install only in your test environment." : "Certificate issued. Install it on your server, then check live HTTPS. Renewal and installation remain manual.";
         db.Notifications.Add(new() { OrganizationId = order.OrganizationId, Message = $"Certificate issued for {string.Join(", ", JsonSerializer.Deserialize<string[]>(order.HostnamesJson)!)}. Installation is still required." });
         await db.SaveChangesAsync(); return null;

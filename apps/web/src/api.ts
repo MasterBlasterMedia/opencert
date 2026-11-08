@@ -79,6 +79,8 @@ export interface Website {
   setupMethod: string;
   httpsTrusted: boolean | null;
   checkedAt: string | null;
+  certificateObservedAt: string | null;
+  nextCheckAt: string;
   expiresAt: string | null;
   issuer: string | null;
   fingerprint: string | null;

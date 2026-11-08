@@ -75,7 +75,7 @@ app.Use(async (ctx, next) =>
 });
 app.MapAuth(); app.MapPasskeys(); app.MapWebsites(); app.MapTeams(); app.MapAccount(); app.MapExternal();
 app.MapGet("/health/live", () => Results.Ok(new { status = "up" }));
-app.MapGet("/health/ready", async (AppDb db) => await db.Database.CanConnectAsync() ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
+app.MapGet("/health/ready", async (AppDb db) => await db.Database.CanConnectAsync() && !(await db.Database.GetPendingMigrationsAsync()).Any() ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503));
 app.MapGet("/api/v1/status", async (AppDb db) =>
 {
     var database = await db.Database.CanConnectAsync(); var heartbeat = database ? await db.Heartbeats.AsNoTracking().SingleOrDefaultAsync(h => h.Id == "worker") : null;
