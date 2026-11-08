@@ -8,6 +8,8 @@ using OpenCert.Api;
 using OpenCert.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+var ingress = WebIngress.Create(builder.Configuration, builder.Environment);
+builder.Configuration["Web:Origin"] = ingress.Origin.GetLeftPart(UriPartial.Authority);
 builder.Logging.ClearProviders(); builder.Logging.AddJsonConsole();
 builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 32768);
 builder.Services.AddOpenCert(builder.Configuration, builder.Environment);
@@ -46,6 +48,8 @@ builder.Services.AddRateLimiter(o =>
 builder.Services.AddOpenApi(); builder.Services.AddProblemDetails();
 var app = builder.Build();
 if (args.Contains("--migrate")) { using var scope = app.Services.CreateScope(); await scope.ServiceProvider.GetRequiredService<AppDb>().Database.MigrateAsync(); return; }
+app.UseForwardedHeaders(ingress.Forwarding);
+app.Use(ingress.Enforce);
 if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.Use(async (ctx, next) =>
 {

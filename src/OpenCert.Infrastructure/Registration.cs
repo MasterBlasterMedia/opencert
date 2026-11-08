@@ -21,6 +21,8 @@ public static class Registration
         else if (!environment.IsDevelopment()) throw new InvalidOperationException("Supply Security__KeyEncryptionCertificate to encrypt the persistent key ring.");
         services.AddScoped<IHttpsInspector, HttpsInspector>(); services.AddScoped<IHostingDiscovery, HostingDiscovery>();
         services.AddHttpClient<IEmailDelivery, EmailDelivery>(c => c.Timeout = TimeSpan.FromSeconds(15));
+        services.AddHttpClient("Acme", client => client.Timeout = TimeSpan.FromSeconds(30))
+            .ConfigurePrimaryHttpMessageHandler(() => AcmeTransport.Create(config, environment));
         services.AddScoped<EmailOutbox>(); services.AddScoped<AcmeOrders>(); services.AddScoped<JobQueue>();
         return services;
     }

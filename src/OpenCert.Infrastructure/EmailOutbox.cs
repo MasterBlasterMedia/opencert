@@ -20,6 +20,7 @@ public sealed class EmailOutbox(AppDb db, IDataProtectionProvider protection, IE
         if (message is null || message.SentAt is not null) return;
         if (message.ExpiresAt <= DateTimeOffset.UtcNow) { message.PayloadProtected = ""; await db.SaveChangesAsync(ct); return; }
         var payload = JsonSerializer.Deserialize<Payload>(protector.Unprotect(message.PayloadProtected))!;
+        await db.RequireLeaseAsync(ct);
         await delivery.Send(payload.To, payload.Subject, payload.Body, message.DeduplicationKey, ct);
         message.SentAt = DateTimeOffset.UtcNow; message.PayloadProtected = ""; await db.SaveChangesAsync(ct);
     }

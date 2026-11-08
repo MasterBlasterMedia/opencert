@@ -6,7 +6,7 @@ Status: implementation in progress; acceptance is tracked in VERIFICATION.md.
 
 A React/TypeScript/Vite client calls an ASP.NET Core 10 modular monolith. A separate .NET worker uses PostgreSQL durable jobs. A customer-side .NET agent owns local certificate keys. PostgreSQL stores Identity, tenants, website observations, orders, public certificates, job leases, notifications and audit events. No customer certificate private keys are accepted by the API.
 
-Use same-origin /api through Vite locally. Production supports a Render static frontend with explicitly configured same-site API origin, and a safer same-origin container alternative. Cookies are HttpOnly, Secure in production, SameSite=Lax; all unsafe browser requests require an antiforgery header. No bearer tokens in localStorage. Identity security stamps and a revocable session table are checked on requests.
+Use same-origin /api through Vite locally. The Render proposal serves the frontend and API from one origin in the same container. Cookies are HttpOnly, Secure in production, SameSite=Lax; all unsafe browser requests require an antiforgery header. No bearer tokens in localStorage. Identity security stamps and a revocable session table are checked on requests.
 
 Email login consumes a bounded, expiring challenge in a transaction and binds it to the initiating browser. Magic-link GET is inert; confirmation POST consumes it. Email access never skips enrolled MFA. Provider identities are keyed by issuer/provider subject; matching email never links accounts implicitly. Identity implements TOTP and WebAuthn; recent strong authentication gates credential and server changes.
 
@@ -22,7 +22,7 @@ ACME defaults to Let's Encrypt staging. Production requires explicit CA director
 
 ## Persistence and scheduling
 
-EF migrations are a separate deployment step using a direct Neon connection. Runtime may use a tested pooled connection with TLS VerifyFull. Jobs are claimed atomically with PostgreSQL FOR UPDATE SKIP LOCKED, a lease owner and lease deadline. A stale worker cannot finish a stolen lease. Payloads contain resource IDs, not secrets. Certificate renewal timing derives from actual validity and ARI when available; no assumed 90-day duration.
+EF migrations are a separate deployment step using a direct Neon connection. Runtime may use a tested pooled connection with TLS VerifyFull. Jobs are claimed atomically with PostgreSQL FOR UPDATE SKIP LOCKED, a lease owner and lease deadline. Leases renew while work is active. Resource writes lock and verify the current lease in the same transaction; stale workers cannot save results or complete stolen jobs. External CA/email requests remain at-least-once across network/crash boundaries, using stable CA account keys, saved remote order URLs and email idempotency keys where supported. Successful pending CA polls defer the same durable job using Retry-After without consuming its failure budget. Payloads contain resource IDs, not secrets. Certificate renewal timing derives from actual validity and ARI when available; no assumed 90-day duration.
 
 ASP.NET Data Protection keys are shared in PostgreSQL, encrypted at rest with an operator-supplied certificate whose private key is outside the database. Development uses a clearly labeled local-only alternative. Secrets never enter source control. Render filesystem is not persistent state.
 

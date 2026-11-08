@@ -5,6 +5,16 @@ namespace OpenCert.Infrastructure;
 
 public static class CsrPolicy
 {
+    public static void ValidateIssued(string certificatePem, string csrPem, string[] names)
+    {
+        Validate(csrPem, names);
+        var request = CertificateRequest.LoadSigningRequestPem(csrPem, HashAlgorithmName.SHA256, CertificateRequestLoadOptions.UnsafeLoadCertificateExtensions);
+        using var certificate = X509Certificate2.CreateFromPem(certificatePem);
+        if (!certificate.PublicKey.ExportSubjectPublicKeyInfo().SequenceEqual(request.PublicKey.ExportSubjectPublicKeyInfo())) throw new ArgumentException("The issued certificate does not match the submitted public key.");
+        var sans = certificate.Extensions.OfType<X509SubjectAlternativeNameExtension>().ToArray();
+        if (sans.Length != 1 || sans[0].EnumerateIPAddresses().Any() || !sans[0].EnumerateDnsNames().Select(n => DomainName.Normalize(n, true)).Order().SequenceEqual(names.Select(n => DomainName.Normalize(n, true)).Order())) throw new ArgumentException("The issued certificate names do not match the request.");
+        if (certificate.NotAfter.ToUniversalTime() <= DateTime.UtcNow || certificate.NotBefore.ToUniversalTime() > DateTime.UtcNow.AddMinutes(5) || certificate.Extensions.OfType<X509BasicConstraintsExtension>().Any(x => x.CertificateAuthority)) throw new ArgumentException("The issued certificate has invalid validity or CA constraints.");
+    }
     public static byte[] Validate(string pem, string[] names)
     {
         if (pem.Length > 24000 || pem.Contains("PRIVATE KEY", StringComparison.Ordinal)) throw new ArgumentException("Upload only a certificate request (CSR). Keep your private key on your server.");

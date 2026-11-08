@@ -8,6 +8,21 @@ namespace OpenCert.Infrastructure;
 
 public sealed class AppDb(DbContextOptions<AppDb> options, IDataProtectionProvider protection) : IdentityDbContext<User>(options), IDataProtectionKeyContext
 {
+    public JobLease? ActiveLease { get; set; }
+    public async Task RequireLeaseAsync(CancellationToken ct = default)
+    {
+        if (ActiveLease is not { } lease) return;
+        var now = DateTimeOffset.UtcNow;
+        var job = await Jobs.FromSqlInterpolated($"SELECT * FROM \"Jobs\" WHERE \"Id\" = {lease.JobId} AND \"LeaseOwner\" = {lease.Owner} AND \"State\" = 'Running' AND \"LeaseUntil\" > {now} FOR UPDATE").AsNoTracking().SingleOrDefaultAsync(ct);
+        if (job is null) throw new LeaseLostException();
+    }
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken ct = default)
+    {
+        if (ActiveLease is null) return await base.SaveChangesAsync(acceptAllChangesOnSuccess, ct);
+        if (Database.CurrentTransaction is not null) { await RequireLeaseAsync(ct); return await base.SaveChangesAsync(acceptAllChangesOnSuccess, ct); }
+        await using var tx = await Database.BeginTransactionAsync(ct);
+        await RequireLeaseAsync(ct); var count = await base.SaveChangesAsync(acceptAllChangesOnSuccess, ct); await tx.CommitAsync(ct); return count;
+    }
     public DbSet<DataProtectionKey> DataProtectionKeys { get; set; } = null!;
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<OutgoingEmail> OutgoingEmails => Set<OutgoingEmail>();
@@ -48,3 +63,6 @@ public sealed class AppDb(DbContextOptions<AppDb> options, IDataProtectionProvid
         b.Entity<IdentityUserToken<string>>().Property(x => x.Value).HasConversion(v => v == null ? null : protector.Protect(v), v => v == null ? null : protector.Unprotect(v));
     }
 }
+
+public sealed record JobLease(Guid JobId, Guid Owner);
+public sealed class LeaseLostException : Exception { public LeaseLostException() : base("The job lease is no longer owned by this worker.") { } }

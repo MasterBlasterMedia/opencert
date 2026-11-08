@@ -13,8 +13,8 @@ OpenCert is free, self-hostable certificate-management software built with React
 - Explicit Google, Microsoft, GitHub, Apple, and Discord account connection middleware. Providers appear only when configured; real provider callbacks still require validation with operator credentials.
 - Personal workspaces, invitations, server-enforced roles, ownership transfer, profiles, verified email changes and guarded deletion.
 - Persistent website onboarding, public DNS/hosting hints, live TLS inspection, and honest status labels.
-- Signed CSR validation and Certes-based ACME DNS-01 order, verification, public-chain download and revocation workflows. The default CA is Let's Encrypt **staging**; live issuance has not yet passed the acceptance gate.
-- A durable PostgreSQL job queue and encrypted email outbox.
+- Signed CSR validation and Certes-based ACME DNS-01 order, verification, public-chain download and revocation workflows. The default CA is Let's Encrypt **staging**; local Pebble issuance/revocation is tested, while real staging issuance remains an acceptance gate.
+- A durable PostgreSQL job queue with lease renewal, stale-worker write fencing, automatic CA polling, and an encrypted email outbox.
 - Local `csr`, `inspect`, and `install` key utility commands. Customer certificate private keys stay on the customer machine.
 
 Automatic DNS changes, enrolled agent operation and unattended renewal are still being developed. Saving a setup preference or issuing a certificate never marks live HTTPS or automatic renewal as verified.
@@ -48,6 +48,8 @@ For a container-based local environment, generate a random `POSTGRES_PASSWORD` i
 ```sh
 dotnet build OpenCert.sln --no-restore
 dotnet test tests/OpenCert.UnitTests --no-restore
+# Use a separate empty database whose name ends in _tests or _ci:
+OPENCERT_PERSISTENCE_DATABASE="$ConnectionStrings__Database" dotnet test tests/OpenCert.PersistenceTests --no-restore
 npm run build --prefix apps/web
 npm run lint --prefix apps/web
 npm test --prefix apps/web
@@ -55,6 +57,8 @@ npm test --prefix apps/web
 python3 tests/OpenCert.IntegrationTests/test_api.py
 npm run e2e --prefix apps/web
 ```
+
+The ACME integration harness requires Docker (or `OPENCERT_CONTAINER_ENGINE=podman`), built Debug binaries, and an explicit disposable database named with `_ci` or `_tests`. Run `bash scripts/test-acme.sh` with `ConnectionStrings__Database` set to that database. It starts an isolated API/worker on port 5081 and loopback Pebble/DNS services, performs actual DNS proof validation, and cleans up the processes it creates. It never disables CA challenge validation or TLS hostname checks. Keep ports 5081, 8053, 8055, 14000 and 15000 free.
 
 Use the [deployment guide](docs/DEPLOYMENT.md) for Render/Neon, [authentication guide](docs/AUTHENTICATION.md) for provider setup, [architecture](docs/architecture/DECISIONS.md), and [threat model](docs/security/THREAT_MODEL.md) for boundaries. Deployment configuration is a reviewable proposal; it does not mean services are running.
 

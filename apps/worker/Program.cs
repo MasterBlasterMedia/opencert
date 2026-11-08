@@ -14,6 +14,17 @@ await builder.Build().RunAsync();
 public sealed class Worker(IServiceScopeFactory scopes, ILogger<Worker> logger) : BackgroundService
 {
     private readonly Guid workerId = Guid.NewGuid();
+    private async Task RenewLease(Guid jobId, CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        while (await timer.WaitForNextTickAsync(ct))
+        {
+            using var scope = scopes.CreateScope();
+            if (!await scope.ServiceProvider.GetRequiredService<JobQueue>().Renew(jobId, workerId, ct)) return;
+            var db = scope.ServiceProvider.GetRequiredService<AppDb>(); var now = DateTimeOffset.UtcNow;
+            await db.Heartbeats.Where(h => h.Id == "worker").ExecuteUpdateAsync(s => s.SetProperty(h => h.At, now), ct);
+        }
+    }
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -25,8 +36,13 @@ public sealed class Worker(IServiceScopeFactory scopes, ILogger<Worker> logger) 
                 await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO \"Heartbeats\" (\"Id\", \"At\") VALUES ('worker', {now}) ON CONFLICT (\"Id\") DO UPDATE SET \"At\" = {now}", stoppingToken);
                 var job = await queue.Lease(workerId, stoppingToken);
                 if (job is null) { await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken); continue; }
+                db.ActiveLease = new JobLease(job.Id, workerId);
+                using var renewCancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                var renewTask = RenewLease(job.Id, renewCancellation.Token);
                 try
                 {
+                    await db.RequireLeaseAsync(stoppingToken);
+                    TimeSpan? pollAfter = null;
                     switch (job.Kind)
                     {
                         case "Inspect":
@@ -39,21 +55,29 @@ public sealed class Worker(IServiceScopeFactory scopes, ILogger<Worker> logger) 
                             await db.SaveChangesAsync(stoppingToken); break;
                         case "EmailSend": await scope.ServiceProvider.GetRequiredService<EmailOutbox>().Deliver(job.ResourceId, stoppingToken); break;
                         case "AcmeCreate": await scope.ServiceProvider.GetRequiredService<AcmeOrders>().Create(job.ResourceId); break;
-                        case "AcmeVerify": await scope.ServiceProvider.GetRequiredService<AcmeOrders>().VerifyAndIssue(job.ResourceId); break;
+                        case "AcmeVerify": pollAfter = await scope.ServiceProvider.GetRequiredService<AcmeOrders>().VerifyAndIssue(job.ResourceId); break;
                         case "AcmeRevoke": await scope.ServiceProvider.GetRequiredService<AcmeOrders>().Revoke(job.ResourceId); break;
                         default: throw new InvalidOperationException("Unsupported job type.");
                     }
-                    await queue.Complete(job, workerId, stoppingToken);
+                    if (pollAfter is { } delay) await queue.Defer(job, workerId, delay, stoppingToken);
+                    else await queue.Complete(job, workerId, stoppingToken);
                 }
+                catch (LeaseLostException) { logger.LogInformation("Abandoned job {JobId} after losing its lease", job.Id); }
                 catch (Exception e) when (e is not OperationCanceledException)
                 {
                     logger.LogWarning("Job {JobId} ({Kind}) failed: {ErrorType}", job.Id, job.Kind, e.GetType().Name);
-                    await queue.Fail(job, workerId, "The operation failed. Check the provider configuration and retry after the waiting period.", stoppingToken);
+                    db.ChangeTracker.Clear();
                     if (job.Kind.StartsWith("Acme", StringComparison.Ordinal))
                     {
                         var order = await db.Orders.FindAsync([job.ResourceId], stoppingToken);
                         if (order is not null) { order.Diagnostic = "The certificate operation failed. Check the CA contact and DNS settings. The worker retries temporary failures up to five times."; if (job.Attempts >= 5) order.State = "Failed"; await db.SaveChangesAsync(stoppingToken); }
                     }
+                    await queue.Fail(job, workerId, "The operation failed. Check the provider configuration and retry after the waiting period.", stoppingToken);
+                }
+                finally
+                {
+                    await renewCancellation.CancelAsync();
+                    try { await renewTask; } catch (OperationCanceledException) { }
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }

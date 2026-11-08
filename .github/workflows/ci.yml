@@ -43,6 +43,10 @@ jobs:
       - run: dotnet restore OpenCert.sln --locked-mode
       - run: dotnet build OpenCert.sln --no-restore
       - run: dotnet test tests/OpenCert.UnitTests/OpenCert.UnitTests.csproj --no-build --no-restore
+      - name: Exercise PostgreSQL concurrency and stale-worker fencing
+        run: dotnet test tests/OpenCert.PersistenceTests/OpenCert.PersistenceTests.csproj --no-build --no-restore
+        env:
+          OPENCERT_PERSISTENCE_DATABASE: Host=localhost;Port=5432;Database=opencert_ci;Username=opencert_ci;Password=disposable-ci-only
       - run: npm ci
         working-directory: apps/web
       - run: npm audit --audit-level=moderate
@@ -70,6 +74,14 @@ jobs:
       - run: python3 tests/OpenCert.IntegrationTests/test_api.py
       - run: npm run e2e
         working-directory: apps/web
+      - name: Create isolated ACME test database
+        run: psql -h localhost -U opencert_ci -d opencert_ci -c 'CREATE DATABASE opencert_acme_ci'
+        env:
+          PGPASSWORD: disposable-ci-only
+      - name: Issue, install and revoke with real local DNS-01 validation
+        run: bash scripts/test-acme.sh
+        env:
+          ConnectionStrings__Database: Host=localhost;Port=5432;Database=opencert_acme_ci;Username=opencert_ci;Password=disposable-ci-only
       # Do not upload private mail, authenticated browser traces, or unredacted logs.
   containers:
     runs-on: ubuntu-24.04

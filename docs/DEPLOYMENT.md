@@ -12,7 +12,9 @@ Serve the built React client and ASP.NET API from one HTTPS Render web service. 
 
 | Variable | Purpose |
 | --- | --- |
-| `Web__Origin` | Exact browser origin, e.g. `https://YOUR-SERVICE.onrender.com` |
+| `Web__Origin` | Required exact HTTPS browser origin, e.g. `https://YOUR-SERVICE.onrender.com` |
+| `Security__TrustedProxies` / `Security__TrustedProxyNetworks` | Comma-separated documented ingress IPs or CIDRs; empty means forwarded headers are ignored |
+| `Security__ForwardLimit` | Trusted proxy hop limit, 1 by default, maximum 5 |
 | `ConnectionStrings__Database` | Npgsql connection string; production requires `SSL Mode=VerifyFull` |
 | `Security__KeyEncryptionCertificateBase64` | Base64 PKCS#12 wrapping certificate with its private key, held in Render secrets |
 | `Security__KeyEncryptionPassword` | Password protecting that PKCS#12 file |
@@ -37,7 +39,11 @@ Migrations on free Render web services must run separately because Render pre-de
 
 ## Reverse proxy and public HTTPS
 
-Render terminates public TLS. Configure forwarded headers only for the documented trusted ingress addresses/networks and verify the resulting public scheme/host. Do not trust arbitrary `X-Forwarded-*` headers. Callback URI, rate-limiter client IP, HTTPS redirects and host filtering require a deployment-specific check before enabling provider login. This proxy-hardening gate is outstanding.
+Render terminates public TLS. Configure `Security__TrustedProxies` and/or `Security__TrustedProxyNetworks` with the actual documented ingress addresses for the deployment. The API processes forwarded client IP and scheme only from these sources, within `Security__ForwardLimit`. It ignores forwarded host/prefix headers and rejects hosts other than `Web__Origin`. Outside Development, non-health requests must resolve to HTTPS and the configured public port. Read-only health GETs may use internal HTTP with the expected Host header. `ASPNETCORE_FORWARDEDHEADERS_ENABLED=true` and all-addresses proxy networks are rejected.
+
+An empty proxy list leaves forwarding disabled; it never enables trust of every source. Do not guess Render ingress ranges or use an unrestricted private-network range to make authentication work. Verify the scheme, host, client-IP chain, health checks and real provider callback through the deployed ingress before enabling public sign-in. Middleware tests cover forged headers and unknown hosts, but Render-specific behavior remains an external deployment gate.
+
+This follows Microsoft's [forwarded-header guidance](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/proxy-load-balancer?view=aspnetcore-10.0) and [unknown-proxy hardening](https://learn.microsoft.com/en-us/aspnet/core/breaking-changes/8/forwarded-headers-unknown-proxies?view=aspnetcore-10.0).
 
 Use the same origin for browser and API. A separate static site on an unrelated `onrender.com` site is not an equivalent authentication topology. Separate custom subdomains require explicit CORS/cookie configuration and browser verification.
 

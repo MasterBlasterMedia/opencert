@@ -17,6 +17,8 @@ services:
         value: "8080"
       - key: Web__Origin
         sync: false
+      - key: Security__TrustedProxyNetworks
+        sync: false
       - key: ConnectionStrings__Database
         sync: false
       - key: Security__KeyEncryptionCertificateBase64
