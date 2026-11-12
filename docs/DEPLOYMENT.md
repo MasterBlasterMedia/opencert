@@ -61,7 +61,13 @@ Use the same origin for browser and API. A separate static site on an unrelated 
 
 ## Scheduled checks and reminders
 
-The worker schedules public HTTPS checks every six hours and checks due schedules once a minute. Expiration notices use the last observed certificate and thresholds of 30, 14, 7 and 1 day, then expiration. A failed live check does not erase the last observed certificate; the UI labels that historical observation. Each certificate/threshold generates at most one workspace notice. Manual renewal reminders use two-thirds of the certificate’s actual validity period; ARI and unattended agent deployment remain separate release gates.
+The worker schedules public HTTPS checks every six hours and checks due schedules once a minute. Expiration notices use the last observed certificate and thresholds of 30, 14, 7 and 1 day, then expiration. A failed live check does not erase the last observed certificate; the UI labels that historical observation. Each certificate/threshold generates at most one workspace notice.
+
+Manual renewal reminders initially use two-thirds of the certificate’s actual validity period. After issuance, the worker fetches public ACME Renewal Information (ARI) from the issuing CA and persists a randomly selected instant within its suggested window, bounded by certificate expiration. An unchanged window keeps the saved instant, including across restarts. Past windows trigger an immediate reminder. Existing issued certificates receive a guidance job during maintenance after the fifth migration.
+
+ARI polling follows Retry-After with a one-minute minimum, one-day maximum and six-hour default, as allowed by [RFC 9773](https://www.rfc-editor.org/rfc/rfc9773.html#section-4.3.2). Failed guidance requests retain the saved reminder and back off from six to twenty-four hours; HTTP 429/503 deadlines can extend that wait. Unsupported CAs retain validity-based reminders. Expired and revoked certificates are not queried. ACME order operations also persist HTTP 429/503 retry deadlines. Public ARI lookups do not require decrypting an account signing key.
+
+The UI displays the reminder date, its source and guidance lookup failures. Issuance and installation remain manual; this is not an unattended renewal implementation. Full agent renewal, replacement-order signaling and public CA validation remain release gates.
 
 Users can disable operational certificate email in account settings. Security messages remain mandatory. Operational email is capped at 20 per recipient per day; workspace notifications remain available when the cap suppresses email. Before delivery, the worker re-checks current workspace membership, the verified email and the email preference. Reminders and preference tests use the private local mail sink; no real-delivery claim is made.
 

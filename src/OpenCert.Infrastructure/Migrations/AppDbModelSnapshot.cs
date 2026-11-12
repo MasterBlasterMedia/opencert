@@ -315,10 +315,34 @@ namespace OpenCert.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("NextRenewalInfoAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("RenewalDueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RenewalInfoCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RenewalInfoError")
+                        .HasColumnType("text");
+
+                    b.Property<int>("RenewalInfoFailures")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RenewalSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Validity");
+
+                    b.Property<DateTimeOffset?>("RenewalWindowEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RenewalWindowStart")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("Staging")

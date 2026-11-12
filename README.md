@@ -14,8 +14,8 @@ OpenCert is free, self-hostable certificate-management software built with React
 - Personal workspaces, invitations, server-enforced roles, ownership transfer, profiles, verified email changes and guarded deletion.
 - Persistent website onboarding, public DNS/hosting hints, live TLS inspection, and honest status labels.
 - Signed CSR validation and Certes-based ACME DNS-01 order, verification, public-chain download and revocation workflows. The default CA is Let's Encrypt **staging**; local Pebble issuance/revocation is tested, while real staging issuance remains an acceptance gate.
-- Scheduled website checks, expiration and manual-renewal reminders, request-failure notifications and configurable operational email.
-- A durable PostgreSQL job queue with lease renewal, stale-worker write fencing, automatic CA polling, and an encrypted email outbox.
+- Scheduled website checks, expiration and manual-renewal reminders using CA renewal guidance (ARI) with an actual-validity fallback, request-failure notifications and configurable operational email.
+- A durable PostgreSQL job queue with lease renewal, stale-worker write fencing, automatic CA polling, persisted rate-limit deadlines, and an encrypted email outbox.
 - Local `csr`, `inspect`, and `install` key utility commands. Customer certificate private keys stay on the customer machine.
 
 Automatic DNS changes, enrolled agent operation and unattended renewal are still being developed. Saving a setup preference or issuing a certificate never marks live HTTPS or automatic renewal as verified.

@@ -95,6 +95,9 @@ export interface Order {
   diagnostic: string | null;
   staging: boolean;
   expiresAt: string | null;
+  renewalDueAt: string | null;
+  renewalSource: string;
+  renewalInfoError: string | null;
   challengesJson: string;
   hostnamesJson: string;
 }

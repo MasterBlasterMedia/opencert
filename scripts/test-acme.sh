@@ -31,6 +31,7 @@ trap cleanup EXIT INT TERM
   ghcr.io/letsencrypt/pebble:2.10.1 -config test/config/opencert.json -strict -dnsserver 127.0.0.1:8053 >/dev/null
 "$engine" cp "$name-ca:/test/certs/pebble.minica.pem" "$run_dir/root.pem"
 export DOTNET_ENVIRONMENT=Development ASPNETCORE_ENVIRONMENT=Development
+export Email__ResendApiKey=''
 export Acme__Directory=https://localhost:14000/dir Acme__DevelopmentRootCertificate="$run_dir/root.pem" Acme__ContactEmail=acme-test@example.com
 export Logging__LogLevel__Default=Warning ASPNETCORE_URLS=http://localhost:5081
 export OPENCERT_TEST_URL=http://localhost:5081 OPENCERT_DOTNET="$dotnet_bin"

@@ -71,6 +71,24 @@ public sealed class JobLeaseTests(TestDatabase fixture) : IClassFixture<TestData
         finally { await db.Jobs.Where(j => j.Id == job.Id).ExecuteDeleteAsync(); }
     }
     [Fact]
+    public async Task FailedOperationsHonorTheProviderDeadlineAndCannotBeChangedByStaleWorkers()
+    {
+        using var scope = fixture.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<AppDb>(); var queue = scope.ServiceProvider.GetRequiredService<JobQueue>();
+        var owner = Guid.NewGuid(); var retryAt = DateTimeOffset.UtcNow.AddDays(2);
+        var job = new Job { Kind = "LeaseTest", DeduplicationKey = "lease-test:" + Guid.NewGuid(), State = "Running", Attempts = 2, LeaseOwner = owner, LeaseUntil = DateTimeOffset.UtcNow.AddMinutes(1) };
+        db.Jobs.Add(job); await db.SaveChangesAsync();
+        try
+        {
+            await queue.Fail(job, Guid.NewGuid(), "stale", default, retryAt);
+            Assert.Equal("Running", (await db.Jobs.AsNoTracking().SingleAsync(j => j.Id == job.Id)).State);
+            await queue.Fail(job, owner, "temporary", default, retryAt);
+            var saved = await db.Jobs.AsNoTracking().SingleAsync(j => j.Id == job.Id);
+            Assert.Equal("Pending", saved.State); Assert.Equal(2, saved.Attempts); Assert.True((saved.DueAt - retryAt).Duration() < TimeSpan.FromMilliseconds(1));
+            Assert.Null(await queue.Lease(Guid.NewGuid(), default));
+        }
+        finally { await db.Jobs.Where(j => j.Id == job.Id).ExecuteDeleteAsync(); }
+    }
+    [Fact]
     public async Task StolenLeasePreventsResourceWritesCompletionFailureAndRenewal()
     {
         using var firstScope = fixture.Services.CreateScope(); var first = firstScope.ServiceProvider.GetRequiredService<AppDb>(); var queue = firstScope.ServiceProvider.GetRequiredService<JobQueue>();

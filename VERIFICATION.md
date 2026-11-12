@@ -1,6 +1,6 @@
 # OpenCert verification and release gates
 
-Last updated: 2026-11-08. This is an implementation and evidence ledger, not a security certification.
+Last updated: 2026-11-12. This is an implementation and evidence ledger, not a security certification.
 
 ## Verified locally
 
@@ -15,14 +15,15 @@ Last updated: 2026-11-08. This is an implementation and evidence ledger, not a s
 | UI accessibility | Automated axe checks on homepage and signed-in empty dashboard, light/dark homepage; mobile homepage has no horizontal overflow |
 | Policy tests | Hostname normalization, IP restrictions, provider suffix boundaries, signed CSR/SAN matching, actual-lifetime renewal calculation, stale-status handling |
 | Dependencies | npm audit reports zero vulnerabilities after patched tooling updates; NuGet reports no vulnerable direct/transitive packages |
-| Database | Four EF migrations applied to disposable PostgreSQL 18 databases and the isolated Neon staging-verification branch |
+| Database | Five EF migrations applied to disposable PostgreSQL 18 databases and the isolated Neon staging-verification branch |
 | Proxy boundary | Middleware tests verify explicit proxy trust, forged-header rejection, fixed host/port, HTTPS enforcement and bounded hop processing |
 | Durable jobs | PostgreSQL tests cover concurrent claims, lost-lease write/completion rejection, bounded crash recovery and persisted polling deadlines |
 | Local ACME | Pebble performs real DNS-01 validation, issuance and revocation; concurrent submissions create one active order; a domain without DNS proof is refused; CA polling persists between worker cycles |
 | Reminders | Periodic checks, deduplicated expiration/renewal/failure notices, optional operational email, delivery-time preference and membership checks, per-recipient email cap |
+| CA renewal guidance | Pebble ARI response produces a saved reminder; PostgreSQL tests verify unchanged-window stability across scopes, urgent-window changes, malformed/invalid responses, rate limits, recovery, unsupported CAs, expired/revoked skip and existing-certificate job backfill |
 | Local installation | Matching key accepted; wrong key, linked targets/parents and shared private-key permissions rejected; previous public chain retained atomically |
 
-Current automated counts: 65 unit cases, 8 PostgreSQL persistence cases, 3 Vitest cases, 6 black-box API journeys, 3 Playwright journeys, 2 isolated Pebble ACME journeys. API and worker container images build locally; the Render Blueprint passes the current JSON schema. The worker/ACME/ingress patch passed both GitHub Actions jobs, including real local DNS-01 validation and both container builds ([run 42486880085](https://github.com/MasterBlasterMedia/opencert/actions/runs/42486880085)). Subsequent scheduling changes require another CI run. Automated accessibility checks are not a full WCAG 2.2 AA audit.
+Current automated counts: 84 unit cases, 13 PostgreSQL persistence cases, 3 Vitest cases, 6 black-box API journeys, 3 Playwright journeys, 2 isolated Pebble ACME journeys. The Render Blueprint passes the current JSON schema. GitHub Actions repeats the automated suites and builds both container images; the reminder baseline passed both jobs ([run 43316931873](https://github.com/MasterBlasterMedia/opencert/actions/runs/43316931873)). Consult [verification runs](https://github.com/MasterBlasterMedia/opencert/actions/workflows/ci.yml) for each subsequent revision. Automated accessibility checks are not a full WCAG 2.2 AA audit.
 
 ## Implemented, not externally verified
 
@@ -38,7 +39,7 @@ Current automated counts: 65 unit cases, 8 PostgreSQL persistence cases, 3 Vites
 | --- | --- |
 | DNS automation | Cloudflare, GoDaddy and Route 53 scoped credentials, TXT preservation/cleanup, live least-privilege tests |
 | Agent automation | Enrollment, key rotation, scoped outbound assignments, typed server configuration/reload, rollback, revocation and local permissions |
-| Renewal | Durable periodic renewal scheduling, ACME ARI and live issuance/installation renewal cycles. Order polling already honors Retry-After and stale-worker database writes are fenced |
+| Renewal | Unattended issuance/installation cycles, agent scheduling, replacement-order signaling and public CA verification. Durable ARI polling and manual reminders are implemented; order polling and rate-limit failures honor Retry-After |
 | Alerts | Real email delivery, agent/installation alerts and delivery-event handling; periodic expiration/order-failure notices and preferences are implemented |
 | Administration | Explicit secure administrator bootstrap, abuse controls, operational dashboards |
 | Security assurance | OAuth attack simulations/live callbacks, DNS/ACME staging tests, hostile network tests, secret scanning, egress policy and independent review |
@@ -48,4 +49,4 @@ Current automated counts: 65 unit cases, 8 PostgreSQL persistence cases, 3 Vites
 
 ## External state
 
-The source is published at [MasterBlasterMedia/opencert](https://github.com/MasterBlasterMedia/opencert). The Neon project was created and read back through its connected account. No OpenCert Render service is live. The default production branch has not received application migrations; all four versioned migrations have been applied to the isolated staging-verification branch. Runtime TLS/pooler validation remains outstanding. No production certificate, unattended renewal, provider callback or independent audit is claimed.
+The source is published at [MasterBlasterMedia/opencert](https://github.com/MasterBlasterMedia/opencert). The Neon project was created and read back through its connected account. No OpenCert Render service is live. The default production branch has not received application migrations; all five versioned migrations have been applied to the isolated staging-verification branch. Runtime TLS/pooler validation remains outstanding. No production certificate, unattended renewal, provider callback or independent audit is claimed.

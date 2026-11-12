@@ -46,6 +46,13 @@ public sealed class CertificateOrder
     public string? Diagnostic { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow; public DateTimeOffset? ExpiresAt { get; set; }
     public DateTimeOffset? RenewalDueAt { get; set; }
+    public string RenewalSource { get; set; } = "Validity";
+    public DateTimeOffset? RenewalWindowStart { get; set; }
+    public DateTimeOffset? RenewalWindowEnd { get; set; }
+    public DateTimeOffset? RenewalInfoCheckedAt { get; set; }
+    public DateTimeOffset? NextRenewalInfoAt { get; set; }
+    public int RenewalInfoFailures { get; set; }
+    public string? RenewalInfoError { get; set; }
     public bool Staging { get; set; } = true; public string Directory { get; set; } = "";
 }
 public sealed class Job

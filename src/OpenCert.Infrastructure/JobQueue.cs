@@ -32,14 +32,16 @@ public sealed class JobQueue(AppDb db)
     public async Task Defer(Job job, Guid worker, TimeSpan delay, CancellationToken ct)
     {
         // A successful CA poll that is still pending is not a failed attempt.
-        var due = DateTimeOffset.UtcNow + delay;
+        var now = DateTimeOffset.UtcNow;
+        var due = delay >= DateTimeOffset.MaxValue - now ? DateTimeOffset.MaxValue : now + delay;
         var changed = await db.Jobs.Where(x => x.Id == job.Id && x.LeaseOwner == worker && x.LeaseUntil > DateTimeOffset.UtcNow && x.State == "Running")
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.State, "Pending").SetProperty(x => x.DueAt, due).SetProperty(x => x.Attempts, x => x.Attempts > 0 ? x.Attempts - 1 : 0).SetProperty(x => x.LeaseUntil, (DateTimeOffset?)null), ct);
         if (changed != 1) throw new LeaseLostException();
     }
-    public async Task Fail(Job job, Guid worker, string message, CancellationToken ct)
+    public async Task Fail(Job job, Guid worker, string message, CancellationToken ct, DateTimeOffset? notBefore = null)
     {
         var state = job.Attempts >= 5 ? "Failed" : "Pending"; var due = DateTimeOffset.UtcNow + RenewalPolicy.RetryDelay(job.Attempts);
+        if (notBefore > due) due = notBefore.Value;
         await db.Jobs.Where(x => x.Id == job.Id && x.LeaseOwner == worker && x.LeaseUntil > DateTimeOffset.UtcNow && x.State == "Running").ExecuteUpdateAsync(s => s.SetProperty(x => x.State, state).SetProperty(x => x.Error, message).SetProperty(x => x.DueAt, due).SetProperty(x => x.LeaseUntil, (DateTimeOffset?)null), ct);
     }
 }

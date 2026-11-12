@@ -585,6 +585,19 @@ function CertificateRequests({ website }: { website: Website }) {
             </span>
           </div>
           <p>{order.diagnostic}</p>
+          {order.state === "Issued" && order.renewalDueAt && (
+            <p>
+              Renewal reminder: {new Date(order.renewalDueAt).toLocaleString()}{" "}
+              (
+              {order.renewalSource === "Ari"
+                ? "suggested by the certificate authority"
+                : "based on this certificate’s validity"}
+              ). You still need to request and install a replacement.
+            </p>
+          )}
+          {order.renewalInfoError && (
+            <p className={s.subtle}>{order.renewalInfoError}</p>
+          )}
           {(
             JSON.parse(order.challengesJson) as {
               name: string;

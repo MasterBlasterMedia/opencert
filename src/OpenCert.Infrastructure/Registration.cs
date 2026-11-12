@@ -22,8 +22,10 @@ public static class Registration
         services.AddScoped<IHttpsInspector, HttpsInspector>(); services.AddScoped<IHostingDiscovery, HostingDiscovery>();
         services.AddHttpClient<IEmailDelivery, EmailDelivery>(c => c.Timeout = TimeSpan.FromSeconds(15));
         services.AddHttpClient("Acme", client => client.Timeout = TimeSpan.FromSeconds(30))
+            .AddHttpMessageHandler(() => new AcmeBackoffHandler())
             .ConfigurePrimaryHttpMessageHandler(() => AcmeTransport.Create(config, environment));
         services.AddScoped<EmailOutbox>(); services.AddScoped<AcmeOrders>(); services.AddScoped<JobQueue>(); services.AddScoped<OperationalMaintenance>();
+        services.AddScoped<AcmeRenewalInformation>();
         return services;
     }
 }

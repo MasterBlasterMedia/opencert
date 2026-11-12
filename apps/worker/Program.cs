@@ -60,22 +60,23 @@ public sealed class Worker(IServiceScopeFactory scopes, ILogger<Worker> logger) 
                         case "AcmeCreate": await scope.ServiceProvider.GetRequiredService<AcmeOrders>().Create(job.ResourceId); break;
                         case "AcmeVerify": pollAfter = await scope.ServiceProvider.GetRequiredService<AcmeOrders>().VerifyAndIssue(job.ResourceId); break;
                         case "AcmeRevoke": await scope.ServiceProvider.GetRequiredService<AcmeOrders>().Revoke(job.ResourceId); break;
+                        case "AcmeRenewalInfo": pollAfter = await scope.ServiceProvider.GetRequiredService<AcmeRenewalInformation>().Poll(job.ResourceId, stoppingToken); break;
                         default: throw new InvalidOperationException("Unsupported job type.");
                     }
                     if (pollAfter is { } delay) await queue.Defer(job, workerId, delay, stoppingToken);
                     else await queue.Complete(job, workerId, stoppingToken);
                 }
                 catch (LeaseLostException) { logger.LogInformation("Abandoned job {JobId} after losing its lease", job.Id); }
-                catch (Exception e) when (e is not OperationCanceledException)
+                catch (Exception e) when (e is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
                 {
                     logger.LogWarning("Job {JobId} ({Kind}) failed: {ErrorType}", job.Id, job.Kind, e.GetType().Name);
                     db.ChangeTracker.Clear();
                     if (job.Kind.StartsWith("Acme", StringComparison.Ordinal))
                     {
                         var order = await db.Orders.FindAsync([job.ResourceId], stoppingToken);
-                        if (order is not null) { order.Diagnostic = "The certificate operation failed. Check the CA contact and DNS settings. The worker retries temporary failures up to five times."; if (job.Attempts >= 5) order.State = "Failed"; await db.SaveChangesAsync(stoppingToken); }
+                        if (order is not null && job.Kind != "AcmeRenewalInfo") { order.Diagnostic = "The certificate operation failed. Check the CA contact and DNS settings. The worker retries temporary failures up to five times."; if (job.Attempts >= 5 && job.Kind is "AcmeCreate" or "AcmeVerify") order.State = "Failed"; await db.SaveChangesAsync(stoppingToken); }
                     }
-                    await queue.Fail(job, workerId, "The operation failed. Check the provider configuration and retry after the waiting period.", stoppingToken);
+                    await queue.Fail(job, workerId, "The operation failed. Check the provider configuration and retry after the waiting period.", stoppingToken, e is AcmeBackoffException backoff ? backoff.RetryAt : null);
                 }
                 finally
                 {

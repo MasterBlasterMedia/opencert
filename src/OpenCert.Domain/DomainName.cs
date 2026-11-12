@@ -51,6 +51,14 @@ public static class PublicNetwork
 
 public static class RenewalPolicy
 {
+    public static DateTimeOffset Suggested(DateTimeOffset start, DateTimeOffset end, DateTimeOffset expires, DateTimeOffset now, double sample)
+    {
+        if (end <= start || start >= expires || expires <= now || sample < 0 || sample >= 1 || double.IsNaN(sample)) throw new ArgumentException("The CA renewal window is invalid.");
+        var limit = end < expires ? end : expires;
+        var selected = start + TimeSpan.FromTicks(Math.Min((limit - start).Ticks - 1, (long)((limit - start).Ticks * sample)));
+        return selected < now ? now : selected;
+    }
+    public static TimeSpan InformationPollDelay(TimeSpan? retryAfter) => TimeSpan.FromSeconds(Math.Clamp((retryAfter ?? TimeSpan.FromHours(6)).TotalSeconds, 60, 86400));
     public static DateTimeOffset Due(DateTimeOffset notBefore, DateTimeOffset notAfter)
     {
         if (notAfter <= notBefore) throw new ArgumentException("Certificate validity is invalid.");

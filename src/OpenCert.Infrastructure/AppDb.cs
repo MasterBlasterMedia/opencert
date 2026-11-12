@@ -38,6 +38,7 @@ public sealed class AppDb(DbContextOptions<AppDb> options, IDataProtectionProvid
     {
         base.OnModelCreating(b);
         b.Entity<User>().Property(x => x.CertificateEmails).HasDefaultValue(true);
+        b.Entity<CertificateOrder>().Property(x => x.RenewalSource).HasDefaultValue("Validity");
         b.Entity<Website>().HasIndex(x => x.NextCheckAt);
         b.Entity<CertificateOrder>().HasIndex(x => x.RenewalDueAt);
         b.Entity<Notification>().HasIndex(x => x.DeduplicationKey).IsUnique();

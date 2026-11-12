@@ -3,6 +3,7 @@ Run only against a dedicated Development API/worker using a disposable database.
 No challenge-validation bypass is permitted in the Pebble configuration.
 """
 import json, os, stat, subprocess, tempfile, time, unittest, uuid
+from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
@@ -44,6 +45,15 @@ class AcmeJourney(unittest.TestCase):
             status,_=c.request(orderpath+'/verify','POST',{});self.assertEqual(status,202)
             order=wait_order(c,base,site['id'],created['id'],['Issued'])
             self.assertEqual(order['state'],'Issued');self.assertTrue(order['staging'])
+            for _ in range(30):
+                status,orders=c.request(base+'/websites/'+site['id']+'/orders');self.assertEqual(status,200)
+                order=next(o for o in orders if o['id']==created['id'])
+                if order['renewalInfoCheckedAt']:break
+                time.sleep(1)
+            self.assertEqual(order['renewalSource'],'Ari',order['renewalInfoError'])
+            self.assertIsNone(order['renewalInfoError'])
+            start,end,due,next_check,checked=[datetime.fromisoformat(order[field].replace('Z','+00:00')) for field in ['renewalWindowStart','renewalWindowEnd','renewalDueAt','nextRenewalInfoAt','renewalInfoCheckedAt']]
+            self.assertLessEqual(start,due);self.assertLess(due,end);self.assertGreater(next_check,checked)
             status,pem=c.request(orderpath+'/certificate');self.assertEqual(status,200);self.assertIn('BEGIN CERTIFICATE',pem);self.assertNotIn('PRIVATE KEY',pem)
             outsider=Client();outsider.login();self.assertEqual(outsider.request(orderpath+'/certificate')[0],404)
             public=Path(temporary)/'chain.pem';public.write_text(pem)

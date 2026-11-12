@@ -8,6 +8,12 @@ public sealed class OperationalMaintenance(AppDb db, EmailOutbox outbox)
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         // One producer at a time; all schedules, notices and mail are committed together.
         if (!await db.Database.SqlQuery<bool>($"SELECT pg_try_advisory_xact_lock({713109714L}) AS \"Value\"").SingleAsync(ct)) return;
+        var untrackedRenewals = await db.Orders.Where(o => o.State == "Issued" && o.CertificatePem != null && o.ExpiresAt > now && o.RenewalInfoCheckedAt == null && !db.Jobs.Any(j => j.DeduplicationKey == "ari:" + o.Id.ToString())).OrderBy(o => o.CreatedAt).Take(100).ToListAsync(ct);
+        foreach (var order in untrackedRenewals)
+        {
+            order.NextRenewalInfoAt = now;
+            db.Jobs.Add(new Job { Kind = "AcmeRenewalInfo", ResourceId = order.Id, DeduplicationKey = "ari:" + order.Id, DueAt = now });
+        }
         var websites = await db.Websites.Where(w => w.NextCheckAt <= now).OrderBy(w => w.NextCheckAt).Take(200).ToListAsync(ct);
         foreach (var website in websites)
         {
@@ -26,7 +32,8 @@ public sealed class OperationalMaintenance(AppDb db, EmailOutbox outbox)
         foreach (var order in due)
         {
             var site = await db.Websites.SingleAsync(w => w.Id == order.WebsiteId, ct);
-            var message = $"The {(order.Staging ? "test " : "")}certificate requested for {site.Hostname} is due for renewal based on its actual validity period. Create a new request on the machine holding your private key, complete verification and install the replacement. Renewal and installation remain manual.";
+            var basis = order.RenewalSource == "Ari" ? "the certificate authority's suggested renewal window" : "its actual validity period";
+            var message = $"The {(order.Staging ? "test " : "")}certificate requested for {site.Hostname} is due for renewal based on {basis}. Create a new request on the machine holding your private key, complete verification and install the replacement. Renewal and installation remain manual.";
             await Notify(order.OrganizationId, "renewal-due:" + order.Id, "Renew your certificate for " + site.Hostname, message, now, ct, email: !order.Staging);
         }
 

@@ -12,21 +12,32 @@ public sealed class AcmeOrders(AppDb db, IDataProtectionProvider protection, ICo
 {
     public string DirectoryUrl => config["Acme:Directory"] ?? "https://acme-staging-v02.api.letsencrypt.org/directory";
     public bool IsStaging => DirectoryUrl != "https://acme-v02.api.letsencrypt.org/directory";
+    private void ValidateDirectory(string directory)
+    {
+        if (!environment.IsDevelopment() && directory is not ("https://acme-staging-v02.api.letsencrypt.org/directory" or "https://acme-v02.api.letsencrypt.org/directory")) throw new InvalidOperationException("Unsupported ACME directory.");
+    }
+    internal AcmeContext RenewalContext(CertificateOrder order)
+    {
+        ValidateDirectory(order.Directory);
+        // ARI is a public GET. It must not depend on access to an account signing key.
+        var directory = new Uri(order.Directory);
+        return new AcmeContext(directory, http: new Certes.Acme.AcmeHttpClient(directory, httpClients.CreateClient("Acme")));
+    }
     private async Task<AcmeContext> Context(CertificateOrder order)
     {
         await db.RequireLeaseAsync();
+        var directory = order.Directory;
         var protector = protection.CreateProtector("OpenCert.AcmeAccounts.v1");
-        if (!environment.IsDevelopment() && DirectoryUrl is not ("https://acme-staging-v02.api.letsencrypt.org/directory" or "https://acme-v02.api.letsencrypt.org/directory")) throw new InvalidOperationException("Unsupported ACME directory.");
+        ValidateDirectory(directory);
         // Persist the account key before making an external request so crash recovery reuses the identity.
-        var account = await db.AcmeAccounts.SingleOrDefaultAsync(a => a.OrganizationId == order.OrganizationId && a.Directory == DirectoryUrl);
+        var account = await db.AcmeAccounts.SingleOrDefaultAsync(a => a.OrganizationId == order.OrganizationId && a.Directory == directory);
         if (account is null)
         {
-            account = new AcmeAccount { OrganizationId = order.OrganizationId, Directory = DirectoryUrl, KeyProtected = protector.Protect(KeyFactory.NewKey(KeyAlgorithm.ES256).ToPem()) };
+            account = new AcmeAccount { OrganizationId = order.OrganizationId, Directory = directory, KeyProtected = protector.Protect(KeyFactory.NewKey(KeyAlgorithm.ES256).ToPem()) };
             db.AcmeAccounts.Add(account); await db.SaveChangesAsync();
         }
-        if (order.Directory != DirectoryUrl) throw new InvalidOperationException("The order's CA directory differs from the current configuration.");
         var key = KeyFactory.FromPem(protector.Unprotect(account.KeyProtected));
-        var acme = new AcmeContext(new Uri(DirectoryUrl), key, new Certes.Acme.AcmeHttpClient(new Uri(DirectoryUrl), httpClients.CreateClient("Acme")));
+        var acme = new AcmeContext(new Uri(directory), key, new Certes.Acme.AcmeHttpClient(new Uri(directory), httpClients.CreateClient("Acme")));
         await acme.NewAccount(config["Acme:ContactEmail"] ?? throw new InvalidOperationException("Configure Acme__ContactEmail before requesting a certificate."), true);
         return acme;
     }
@@ -86,6 +97,8 @@ public sealed class AcmeOrders(AppDb db, IDataProtectionProvider protection, ICo
         using var certificate = X509Certificate2.CreateFromPem(order.CertificatePem);
         order.ExpiresAt = new DateTimeOffset(certificate.NotAfter.ToUniversalTime()); order.State = "Issued";
         order.RenewalDueAt = OpenCert.Domain.RenewalPolicy.Due(new DateTimeOffset(certificate.NotBefore.ToUniversalTime()), order.ExpiresAt.Value);
+        order.NextRenewalInfoAt = DateTimeOffset.UtcNow;
+        db.Jobs.Add(new Job { Kind = "AcmeRenewalInfo", ResourceId = order.Id, DeduplicationKey = "ari:" + order.Id });
         order.Diagnostic = order.Staging ? "Test certificate issued. Browsers do not trust staging certificates. Install only in your test environment." : "Certificate issued. Install it on your server, then check live HTTPS. Renewal and installation remain manual.";
         db.Notifications.Add(new() { OrganizationId = order.OrganizationId, Message = $"Certificate issued for {string.Join(", ", JsonSerializer.Deserialize<string[]>(order.HostnamesJson)!)}. Installation is still required." });
         await db.SaveChangesAsync(); return null;
