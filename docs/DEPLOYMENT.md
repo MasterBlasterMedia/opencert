@@ -28,7 +28,7 @@ Do not reuse a customer certificate key as the wrapping key. Rotation must retai
 
 ## Database and migrations
 
-Create a separate Neon staging branch. Apply all migrations there with a **direct** connection, then run the integration checks against disposable data. `--migrate` is explicit: application startup never silently changes schema. Use a direct production connection for the migration step after reviewing the generated migration and backup/restore plan. Runtime pooling must be tested separately; no pooler compatibility claim is made yet.
+Create a separate Neon staging branch. Apply all migrations there with a **direct** connection, then run the integration checks against disposable data. `--migrate` is explicit: application startup never silently changes schema. Use a direct production connection for the migration step after reviewing the generated migration and backup/restore plan. Runtime pooling is tested separately: the Production API, encrypted key-ring restart and all 13 persistence cases passed on Neon's staging pooler. Validate again against the intended deployment configuration; this is not a claim that every session-level PostgreSQL feature works through pooling.
 
 ```sh
 # Supply secrets in the process environment through your host/secret manager.
@@ -36,6 +36,14 @@ dotnet OpenCert.Api.dll --migrate
 ```
 
 Migrations on free Render web services must run separately because Render pre-deploy commands require a paid service. Avoid concurrent migration runs; EF's provider migration lock and a single release operator are required. Do not put database credentials in the build context or Docker build arguments. Production connection strings are parsed and checked for `VerifyFull`, not accepted by substring matching.
+
+To repeat the isolated runtime check, place a Neon PostgreSQL URI in a mode-0600 ignored file for a database ending in `_ci` or `_tests`. Build the Debug API and run:
+
+```sh
+python3 scripts/check-neon-runtime.py --connection-file .local/runtime-check/database-uri
+```
+
+Set `OPENCERT_DOTNET` if the executable is not on PATH. The check uses OpenSSL to create a dedicated wrapping certificate, runs migrations through the direct connection, starts a loopback-only Production API on port 5082, and repeats CSRF validation after restarting with the pooled connection. It checks Secure/HttpOnly cookies and rejects an invalid token. The simulated proxy trusts only loopback; it does not validate Render ingress. It never sends email or requests a certificate. The test database and mode-0600 wrapping material in `.local/runtime-check` remain available for repeat runs and must never be reused for production.
 
 ## Reverse proxy and public HTTPS
 

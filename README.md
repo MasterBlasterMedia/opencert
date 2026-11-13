@@ -61,6 +61,8 @@ npm run e2e --prefix apps/web
 
 The ACME integration harness requires Docker (or `OPENCERT_CONTAINER_ENGINE=podman`), built Debug binaries, and an explicit disposable database named with `_ci` or `_tests`. Run `bash scripts/test-acme.sh` with `ConnectionStrings__Database` set to that database. It starts an isolated API/worker on port 5081 and loopback Pebble/DNS services, performs actual DNS proof validation, and cleans up the processes it creates. It never disables CA challenge validation or TLS hostname checks. Keep ports 5081, 8053, 8055, 14000 and 15000 free.
 
+An optional Neon runtime check verifies direct and pooled TLS connections and the encrypted key ring across a Production API restart. See the [deployment guide](docs/DEPLOYMENT.md#database-and-migrations) for the private credential file and isolated test-database requirements.
+
 Use the [deployment guide](docs/DEPLOYMENT.md) for Render/Neon, [authentication guide](docs/AUTHENTICATION.md) for provider setup, [architecture](docs/architecture/DECISIONS.md), and [threat model](docs/security/THREAT_MODEL.md) for boundaries. Deployment configuration is a reviewable proposal; it does not mean services are running.
 
 ## Contributing and license

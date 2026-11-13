@@ -221,6 +221,19 @@ test("passkey registration, verified sign-in, replay rejection and removal", asy
       })
     ).status(),
   ).toBe(400);
+  const sessionAfterReplay = await page.request.get("/api/v1/auth/me");
+  expect(
+    sessionAfterReplay.status(),
+    "replay rejection preserves the signed-in session",
+  ).toBe(200);
+  const passkeysAfterReplay = await page.request.get("/api/v1/auth/passkeys/");
+  expect(passkeysAfterReplay.status()).toBe(200);
+  const savedNames = (await passkeysAfterReplay.json()).map(
+    (key: { name: string }) => key.name,
+  );
+  expect(savedNames, "sign-in preserves the registered passkey name").toContain(
+    "Browser test key",
+  );
   await page.goto("/app/account");
   await expect(
     page.getByText("Browser test key", { exact: true }),

@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-12. This is an implementation and evidence ledger, not a security certification.
 
-## Verified locally
+## Verified locally and on isolated staging
 
 | Area | Evidence |
 | --- | --- |
@@ -16,6 +16,7 @@ Last updated: 2026-11-12. This is an implementation and evidence ledger, not a s
 | Policy tests | Hostname normalization, IP restrictions, provider suffix boundaries, signed CSR/SAN matching, actual-lifetime renewal calculation, stale-status handling |
 | Dependencies | npm audit reports zero vulnerabilities after patched tooling updates; NuGet reports no vulnerable direct/transitive packages |
 | Database | Five EF migrations applied to disposable PostgreSQL 18 databases and the isolated Neon staging-verification branch |
+| Neon runtime | Production API uses VerifyFull on direct and pooled connections; a CSRF token survives a process restart with the shared certificate-wrapped key ring; invalid tokens fail; all 13 persistence cases also pass through the Neon pooler |
 | Proxy boundary | Middleware tests verify explicit proxy trust, forged-header rejection, fixed host/port, HTTPS enforcement and bounded hop processing |
 | Durable jobs | PostgreSQL tests cover concurrent claims, lost-lease write/completion rejection, bounded crash recovery and persisted polling deadlines |
 | Local ACME | Pebble performs real DNS-01 validation, issuance and revocation; concurrent submissions create one active order; a domain without DNS proof is refused; CA polling persists between worker cycles |
@@ -23,7 +24,9 @@ Last updated: 2026-11-12. This is an implementation and evidence ledger, not a s
 | CA renewal guidance | Pebble ARI response produces a saved reminder; PostgreSQL tests verify unchanged-window stability across scopes, urgent-window changes, malformed/invalid responses, rate limits, recovery, unsupported CAs, expired/revoked skip and existing-certificate job backfill |
 | Local installation | Matching key accepted; wrong key, linked targets/parents and shared private-key permissions rejected; previous public chain retained atomically |
 
-Current automated counts: 84 unit cases, 13 PostgreSQL persistence cases, 3 Vitest cases, 6 black-box API journeys, 3 Playwright journeys, 2 isolated Pebble ACME journeys. The Render Blueprint passes the current JSON schema. GitHub Actions repeats the automated suites and builds both container images; the reminder baseline passed both jobs ([run 43316931873](https://github.com/MasterBlasterMedia/opencert/actions/runs/43316931873)). Consult [verification runs](https://github.com/MasterBlasterMedia/opencert/actions/workflows/ci.yml) for each subsequent revision. Automated accessibility checks are not a full WCAG 2.2 AA audit.
+Current automated counts: 84 unit cases, 13 PostgreSQL persistence cases, 3 Vitest cases, 6 black-box API journeys, 3 Playwright journeys, 2 isolated Pebble ACME journeys. The Render Blueprint passes the current JSON schema. GitHub Actions repeats the automated suites and builds both container images; the renewal-guidance patch passed both jobs on attempt 2 ([run 43319973532](https://github.com/MasterBlasterMedia/opencert/actions/runs/43319973532)). The first attempt timed out waiting for the passkey label after sign-in; the cause remains unconfirmed. Local reproduction with both .NET 10.0.14 and CI's 10.0.15 passed. The browser test now separately checks session validity and the saved passkey name after replay rejection. Consult [verification runs](https://github.com/MasterBlasterMedia/opencert/actions/workflows/ci.yml) for subsequent revisions. Automated accessibility checks are not a full WCAG 2.2 AA audit.
+
+The external runtime check uses `opencert_runtime_ci` on the existing staging-verification branch, with synthetic data only. All five EF migrations ran through the application's direct Npgsql connection. The database readback confirmed one encrypted Data Protection key and no plaintext master-key element. `scripts/check-neon-runtime.py` reproduces the direct/pooler and restart checks. This verifies this application/driver path, not every PgBouncer feature, production hosting, secret rotation or a full backup-restore drill.
 
 ## Implemented, not externally verified
 
@@ -44,9 +47,9 @@ Current automated counts: 84 unit cases, 13 PostgreSQL persistence cases, 3 Vite
 | Administration | Explicit secure administrator bootstrap, abuse controls, operational dashboards |
 | Security assurance | OAuth attack simulations/live callbacks, DNS/ACME staging tests, hostile network tests, secret scanning, egress policy and independent review |
 | Privacy and retention | Final retention/export/deletion policy; certificate-history workspaces currently cannot be deleted |
-| Deployment | Validated images, CI, branch migration on Neon, Render services, HTTPS/cookie/proxy behavior and rollback drill |
+| Deployment | Render services and actual ingress/HTTPS/cookie behavior, operational secrets and rollback drill. Isolated Neon direct/pooler TLS and key-ring restart checks pass |
 | Release | Dependency/license review, full browser/accessibility matrix, operator privacy/terms/security contacts |
 
 ## External state
 
-The source is published at [MasterBlasterMedia/opencert](https://github.com/MasterBlasterMedia/opencert). The Neon project was created and read back through its connected account. No OpenCert Render service is live. The default production branch has not received application migrations; all five versioned migrations have been applied to the isolated staging-verification branch. Runtime TLS/pooler validation remains outstanding. No production certificate, unattended renewal, provider callback or independent audit is claimed.
+The source is published at [MasterBlasterMedia/opencert](https://github.com/MasterBlasterMedia/opencert). The Neon project was created and read back through its connected account. No OpenCert Render service is live. The default production branch has not received application migrations; all five versioned migrations have been applied to the isolated staging-verification branch and its runtime test database. Neon credentials and test wrapping material are held only in private ignored local files. No production certificate, unattended renewal, provider callback or independent audit is claimed.
