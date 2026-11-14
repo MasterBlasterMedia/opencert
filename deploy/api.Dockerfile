@@ -5,7 +5,7 @@ COPY apps/web/package*.json ./
 RUN npm ci
 COPY apps/web/ ./
 RUN npm run build
-FROM mcr.microsoft.com/dotnet/sdk:10.0.403 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0.100 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet restore apps/api/OpenCert.Api.csproj --locked-mode
