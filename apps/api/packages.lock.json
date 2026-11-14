@@ -4,9 +4,9 @@
     "net10.0": {
       "AspNet.Security.OAuth.Discord": {
         "type": "Direct",
-        "requested": "[10.0.0, )",
-        "resolved": "10.0.0",
-        "contentHash": "R2EcvQOUXXWsdRElkmxo6jz+2UgqsJ2F0uxmYj9/v6vdGpIT9+SKokV19mrMFGIYhK1JXvuTQwb+uKgYFKbxlg=="
+        "requested": "[10.1.0, )",
+        "resolved": "10.1.0",
+        "contentHash": "BG1iLZOxAg4ky3cMwSInZ2VTJix1ZHEik423YyrRgI+gzQ23/j/G7KN5imZZaRehPXya51d2cOi7GmuQpYM44g=="
       },
       "AspNet.Security.OAuth.GitHub": {
         "type": "Direct",
