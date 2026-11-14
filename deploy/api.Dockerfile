@@ -10,7 +10,7 @@ WORKDIR /src
 COPY . .
 RUN dotnet restore apps/api/OpenCert.Api.csproj --locked-mode
 RUN dotnet publish apps/api/OpenCert.Api.csproj -c Release --no-restore -o /out /p:UseAppHost=false
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.14
+FROM mcr.microsoft.com/dotnet/aspnet:11.0.0
 WORKDIR /app
 COPY --from=build /out .
 COPY --from=web /src/apps/web/dist ./wwwroot
